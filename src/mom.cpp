@@ -5,9 +5,13 @@
 #include <FS.h>
 #include "SPIFFS.h"
 #include <WiFiGeneric.h>
-
+#define MAX_MASTERS 4
 const char *ssid = "Galaxy S10+d6db";
 const char *password = "nhnr9088";
+
+
+const char* hotspotPass = "87654321";//pass for hotspot
+const char* deviceName = "kinetick-balls-mom";//name of device in networt
 
 IPAddress staticIP(192, 168, 1, 200); // for esp
 IPAddress gateWay(192, 168, 1, 1);    // for router
@@ -17,16 +21,28 @@ IPAddress dns(8, 8, 8, 8);
 WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
+struct MasterData {
+    uint16_t rgb;
+    uint8_t id;
+    uint8_t height;
+    uint8_t time;
+};
+
 struct State
 {
-    bool masterConnections[4] = {false, false, false, false};
+    bool masterConnections[MAX_MASTERS];
+
+    
+    // 0 to 3(index of the array) is the id of the master micros and the value is websocket connection number of the master
+    uint8_t masterWebsocketConnectionNumbers[MAX_MASTERS]; 
+
 } _state;
 
 void setup()
 {
     Serial.begin(115200);
     SPIFFS.begin();
-    startWifi();
+    startSoftAP();
     startHTTPServer();
     startWebSocket();
 }
@@ -35,24 +51,16 @@ void loop()
 {
 }
 
-void startWifi()
-{
-    WiFi.mode(WIFI_STA);
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.print(".");
-        delay(500);
-    }
-    Serial.println();
-    staticIP[2] = IPAddress(WiFi.gatewayIP())[2];
-    WiFi.config(staticIP, IPAddress(WiFi.gatewayIP()), IPAddress(WiFi.subnetMask()), dns);
-    Serial.print("ESP32 IP Address: ");
-
-    Serial.println(WiFi.localIP());
+void startSoftAP(){
+    //WiFi.mode(WIFI_OFF);
+    Serial.println("starting soft AP");
+    WiFi.enableSTA(false);
+    WiFi.enableAP(true);
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(deviceName, hotspotPass, 6);
+    WiFi.softAPConfig(IPAddress(192,168,1,200), gateWay, subnet);
+    WiFi.softAPIP();
+    Serial.println(WiFi.softAPIP());
 }
 /////////////////////////////////////////HTTP SERVER//////////////////////////////////////////////////////////////////////
 bool handleFileRead(String path)
@@ -127,4 +135,7 @@ void startWebSocket()
 {
     webSocket.begin();
     webSocket.onEvent(webSocketEvent); // if there's an incoming websocket message, go to function 'webSocketEvent'
+}
+void setMasterStatus(uint8_t masterNumber, bool status){
+    _state.masterConnections[masterNumber] = status;
 }
