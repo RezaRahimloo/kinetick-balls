@@ -9,9 +9,8 @@
 const char *ssid = "Galaxy S10+d6db";
 const char *password = "nhnr9088";
 
-
-const char* hotspotPass = "87654321";//pass for hotspot
-const char* deviceName = "kinetick-balls-mom";//name of device in networt
+const char *hotspotPass = "87654321";          // pass for hotspot
+const char *deviceName = "kinetick-balls-mom"; // name of device in networt
 
 IPAddress staticIP(192, 168, 1, 200); // for esp
 IPAddress gateWay(192, 168, 1, 1);    // for router
@@ -20,8 +19,15 @@ IPAddress dns(8, 8, 8, 8);
 
 WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
-
-struct MasterData {
+enum DataTypes
+{
+    ID = 0,
+    HEIGHT = 1,
+    TIME = 2,
+    RGB = 3,
+};
+struct MasterData
+{
     uint16_t rgb;
     uint8_t id;
     uint8_t height;
@@ -32,9 +38,9 @@ struct State
 {
     bool masterConnections[MAX_MASTERS];
 
-    
     // 0 to 3(index of the array) is the id of the master micros and the value is websocket connection number of the master
-    uint8_t masterWebsocketConnectionNumbers[MAX_MASTERS]; 
+    uint8_t masterWebsocketConnectionNumbers[MAX_MASTERS];
+    bool sentCommand = false;
 
 } _state;
 
@@ -49,16 +55,26 @@ void setup()
 
 void loop()
 {
+    if (!_state.sentCommand &&
+        _state.masterConnections[0] &&
+        _state.masterConnections[1] &&
+        _state.masterConnections[2] &&
+        _state.masterConnections[3])
+    {
+        readAndSendFile();
+    }
+    webSocket.loop();
 }
 
-void startSoftAP(){
-    //WiFi.mode(WIFI_OFF);
+void startSoftAP()
+{
+    // WiFi.mode(WIFI_OFF);
     Serial.println("starting soft AP");
     WiFi.enableSTA(false);
     WiFi.enableAP(true);
     WiFi.mode(WIFI_AP);
     WiFi.softAP(deviceName, hotspotPass, 6);
-    WiFi.softAPConfig(IPAddress(192,168,1,200), gateWay, subnet);
+    WiFi.softAPConfig(IPAddress(192, 168, 1, 200), gateWay, subnet);
     WiFi.softAPIP();
     Serial.println(WiFi.softAPIP());
 }
@@ -114,6 +130,18 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     switch (type)
     {
     case WStype_DISCONNECTED:
+        int8_t dcNumber = -1;
+        for (size_t i = 0; i < 4; i++)
+        {
+            if (_state.masterWebsocketConnectionNumbers[i] == num)
+            {
+                dcNumber = i;
+            }
+        }
+        if (dcNumber != -1)
+        {
+            _state.masterWebsocketConnectionNumbers[dcNumber] = false;
+        }
         break;
     case WStype_CONNECTED:
     {
@@ -130,12 +158,39 @@ void proccessWebsocketMessage(String msg, uint8_t num)
 { // figure out the message
 
     Serial.println(msg);
+    if (msg.startsWith("id:"))
+    {
+        uint8_t id = msg.substring(3).toInt();
+        _state.masterConnections[id] = true;
+    }
 }
 void startWebSocket()
 {
     webSocket.begin();
     webSocket.onEvent(webSocketEvent); // if there's an incoming websocket message, go to function 'webSocketEvent'
 }
-void setMasterStatus(uint8_t masterNumber, bool status){
+void setMasterStatus(uint8_t masterNumber, bool status)
+{
     _state.masterConnections[masterNumber] = status;
+}
+////////////////////////////////////////STORAGE///////////////////////////////////////////////////////////
+void readAndSendFile()
+{
+    File image3D = SPIFFS.open("/saved3DImage.txt", "r");
+    String currentReadingValue = "";
+    uint16_t currentRow = 0;
+
+    for (uint16_t i = 0; i < image3D.size(); i++)
+    {
+        char readingCharacter = (char)image3D.read();
+        if (readingCharacter == '\n')
+        {
+            webSocket.sendTXT(_state.masterWebsocketConnectionNumbers[currentRow / 36],
+                              String("dataRow:") + currentReadingValue);
+        }
+        else
+        {
+            currentReadingValue += readingCharacter;
+        }
+    }
 }

@@ -43,6 +43,7 @@ void setup()
 
 void loop()
 {
+  webSocket.loop();
 }
 
 void startWifi()
@@ -92,8 +93,8 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 }
 void proccessWebsocketMessage(String msg)
 { // figure out the message
-  if(msg.startsWith("data:")){
-    decypherData(msg.substring(5));
+  if(msg.startsWith("dataRow:")){
+    decypherData(msg.substring(8));
   }
   Serial.println(msg);
 }
