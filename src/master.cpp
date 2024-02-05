@@ -20,10 +20,11 @@ IPAddress dns(8, 8, 8, 8);
 /////////////////////////////////////SERVER/////////////////////////////////////////////////////////
 WebSocketsClient webSocket; // websocket client class instance
 
-struct SlaveData {
-    uint16_t rgb;
-    uint8_t height;
-    uint8_t time;
+struct SlaveData
+{
+  uint16_t rgb;
+  uint8_t height;
+  uint8_t time;
 };
 
 SlaveData slavesData[MAX_SLAVES];
@@ -93,7 +94,8 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 }
 void proccessWebsocketMessage(String msg)
 { // figure out the message
-  if(msg.startsWith("dataRow:")){
+  if (msg.startsWith("dataRow:"))
+  {
     decypherData(msg.substring(8));
   }
   Serial.println(msg);
