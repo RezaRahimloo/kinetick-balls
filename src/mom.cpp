@@ -63,6 +63,7 @@ void loop()
     {
         readAndSendFile();
     }
+    server.handleClient();
     webSocket.loop();
 }
 
